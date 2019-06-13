@@ -36,8 +36,8 @@ import org.litote.kmongo.Id
 import org.litote.kmongo.ascending
 import org.litote.kmongo.deleteMany
 import org.litote.kmongo.deleteOneById
-import org.litote.kmongo.ensureIndex
-import org.litote.kmongo.ensureUniqueIndex
+import fr.vsct.tock.shared.ensureIndex
+import fr.vsct.tock.shared.ensureUniqueIndex
 import org.litote.kmongo.eq
 import org.litote.kmongo.exists
 import org.litote.kmongo.findOne

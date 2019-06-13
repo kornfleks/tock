@@ -31,8 +31,8 @@ import org.bson.types.ObjectId
 import org.litote.kmongo.Id
 import org.litote.kmongo.deleteOne
 import org.litote.kmongo.deleteOneById
-import org.litote.kmongo.ensureIndex
-import org.litote.kmongo.ensureUniqueIndex
+import fr.vsct.tock.shared.ensureIndex
+import fr.vsct.tock.shared.ensureUniqueIndex
 import org.litote.kmongo.eq
 import org.litote.kmongo.find
 import org.litote.kmongo.findOne
