@@ -28,8 +28,10 @@ import com.fasterxml.jackson.datatype.jsr310.deser.JSR310StringParsableDeseriali
 import com.fasterxml.jackson.datatype.jsr310.ser.DurationSerializer
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClient
+import com.mongodb.MongoClientOptions
 import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoDatabase
+import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.changestream.ChangeStreamDocument
 import com.mongodb.client.model.changestream.FullDocument
 import com.mongodb.connection.netty.NettyStreamFactoryFactory
@@ -38,14 +40,22 @@ import de.undercouch.bson4jackson.types.Decimal128
 import fr.vsct.tock.shared.jackson.addDeserializer
 import fr.vsct.tock.shared.jackson.addSerializer
 import fr.vsct.tock.shared.jackson.jacksonAdditionalModules
+import fr.vsct.tock.shared.security.getNoopSslContext
+import fr.vsct.tock.shared.security.setSslProperties
 import mu.KotlinLogging
+import org.bson.BsonDocument
+import org.bson.conversions.Bson
 import org.litote.kmongo.KMongo
+import org.litote.kmongo.ascending
+import org.litote.kmongo.ensureIndex
+import org.litote.kmongo.ensureUniqueIndex
 import org.litote.kmongo.id.IdGenerator
 import org.litote.kmongo.id.ObjectIdToStringGenerator
 import org.litote.kmongo.reactivestreams.watchIndefinitely
 import org.litote.kmongo.util.CollectionNameFormatter
 import org.litote.kmongo.util.KMongoConfiguration
 import org.litote.kmongo.util.KMongoConfiguration.registerBsonModule
+import org.litote.kmongo.util.KMongoUtil
 import java.time.Duration
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -118,11 +128,23 @@ private val mongoUrl = ConnectionString(
 )
 
 /**
+ * PEM mongo certificate name, only if mongo is used in SSL.
+ * The certificate should be accessible from the classpath.
+ */
+private val mongoCaCert = property(
+    "tock_mongo_ssl_cert",
+    ""
+)
+
+/**
  * The sync [MongoClient] of Tock.
  */
 internal val mongoClient: MongoClient by lazy {
     TockKMongoConfiguration.configure()
-    KMongo.createClient(mongoUrl)
+    val uri = com.mongodb.MongoClientURI(mongoUrl.toString())
+    val uriWithSSLCustomContext = com.mongodb.MongoClientURI(uri.uri, MongoClientOptions.builder(uri.options).sslContext(getNoopSslContext()))
+    val client = KMongo.createClient(uriWithSSLCustomContext)
+    client
 }
 
 /**
@@ -133,8 +155,14 @@ internal val asyncMongoClient: com.mongodb.reactivestreams.client.MongoClient by
     org.litote.kmongo.reactivestreams.KMongo.createClient(
         MongoClientSettings.builder()
             .applyConnectionString(mongoUrl)
+            .applyToSslSettings {
+                if (mongoUrl.sslEnabled == true && mongoUrl.sslInvalidHostnameAllowed == true) {
+                    it.context(getNoopSslContext())
+                }
+            }
             .apply {
                 if (mongoUrl.sslEnabled == true) {
+                    setSslProperties(mongoCaCert)
                     streamFactoryFactory(NettyStreamFactoryFactory.builder().build())
                 }
             }
@@ -169,11 +197,80 @@ inline fun <reified T : Any> MongoCollection<T>.watch(
     fullDocument: FullDocument = FullDocument.DEFAULT,
     noinline listener: (ChangeStreamDocument<T>) -> Unit
 ) {
-    watchIndefinitely(
-        fullDocument = fullDocument,
-        subscribeListener = { (KotlinLogging.logger {}).info { "Subscribe stream" } },
-        errorListener = { (KotlinLogging.logger {}).error(it) },
-        reopenListener = { (KotlinLogging.logger {}).warn { "Reopen stream" } },
-        listener = listener
-    )
+    // TODO: Change streams are not supported in DocumentDB - Implement an alternative method for database triggers in DocumentDB
+    if (!isDocumentDB()) {
+        val loggerBis = KotlinLogging.logger {}
+        loggerBis.info("Watch ")
+        watchIndefinitely(
+            fullDocument = fullDocument,
+            subscribeListener = { (KotlinLogging.logger {}).info { "Subscribe stream" } },
+            errorListener = { (KotlinLogging.logger {}).error(it) },
+            reopenListener = { (KotlinLogging.logger {}).warn { "Reopen stream" } },
+            listener = listener
+        )
+    }
 }
+
+fun <T> com.mongodb.client.MongoCollection<T>.ensureIndex(vararg properties: kotlin.reflect.KProperty<*>,
+                                                          indexOptions: com.mongodb.client.model.IndexOptions = IndexOptions()): kotlin.String {
+    generateIndex(ascending(*properties), indexOptions = indexOptions)?.let { indexOptions.name(it) }
+    return ensureIndex(*properties, indexOptions = indexOptions)
+}
+
+fun <T> com.mongodb.client.MongoCollection<T>.ensureUniqueIndex(vararg properties: kotlin.reflect.KProperty<*>,
+                                                                indexOptions: com.mongodb.client.model.IndexOptions = IndexOptions()): kotlin.String {
+    generateIndex(ascending(*properties), indexOptions = indexOptions)?.let { indexOptions.name(it) }
+    return ensureUniqueIndex(*properties, indexOptions = indexOptions)
+}
+
+fun <T> com.mongodb.client.MongoCollection<T>.ensureIndex(keys: Bson,
+                                                          indexOptions: IndexOptions = IndexOptions()): String {
+    generateIndex(keys, indexOptions = indexOptions)?.let { indexOptions.name(it) }
+    return ensureIndex(keys, indexOptions = indexOptions)
+}
+
+fun <T> com.mongodb.client.MongoCollection<T>.ensureIndex(keys: String,
+                                                          indexOptions: IndexOptions = IndexOptions()): String {
+    generateIndex(KMongoUtil.toBson(keys), indexOptions = indexOptions)?.let { indexOptions.name(it) }
+    return ensureIndex(keys, indexOptions = indexOptions)
+}
+
+fun isDocumentDB(): Boolean {
+    return (booleanProperty("tock_document_db_on", false))
+}
+
+/**
+ * Generate and return an index matching DocumentDB limits (32 characters maximum in a compound index) with the given document keys and options
+ */
+private fun generateIndex(document: Bson, indexOptions: com.mongodb.client.model.IndexOptions): String? {
+    // Don't generate an index if the database isn't DocumentDB
+    if (!isDocumentDB()) {
+        return null
+    }
+
+    if (indexOptions.name?.let { it.length > DocumentDBIndexLimitSize } != false) {
+        var index = ""
+        var reducedIndex = ""
+
+        for ((key, value) in (document as BsonDocument).entries) {
+            val sort: String = value.takeIf { it.isInt32 }?.asInt32()?.value.toString()
+            index += key + sort
+            reducedIndex += key.let { if (it.length > DocumentDBIndexReducedSize) it.substring(0, DocumentDBIndexReducedSize) else it } + sort
+        }
+
+        if (index.length <= DocumentDBIndexLimitSize) {
+            return index
+        }
+        if (reducedIndex.length <= DocumentDBIndexLimitSize) {
+            return reducedIndex
+        } else {
+            logger.error("Generated reduced index too long : $index")
+        }
+        return index
+    }
+    return null
+}
+
+private const val DocumentDBIndexLimitSize = 32
+
+private const val DocumentDBIndexReducedSize = 3
