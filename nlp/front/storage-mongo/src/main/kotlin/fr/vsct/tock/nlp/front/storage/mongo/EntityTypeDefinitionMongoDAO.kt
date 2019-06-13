@@ -27,7 +27,7 @@ import fr.vsct.tock.nlp.front.storage.mongo.MongoFrontConfiguration.asyncDatabas
 import fr.vsct.tock.nlp.front.storage.mongo.MongoFrontConfiguration.database
 import fr.vsct.tock.shared.watch
 import org.litote.kmongo.and
-import org.litote.kmongo.ensureUniqueIndex
+import fr.vsct.tock.shared.ensureUniqueIndex
 import org.litote.kmongo.eq
 import org.litote.kmongo.findOne
 import org.litote.kmongo.getCollection
