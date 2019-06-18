@@ -16,11 +16,14 @@
 
 package fr.vsct.tock.shared
 
+import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.JsonTokenId
 import com.fasterxml.jackson.databind.DeserializationContext
+import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer
 import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer
 import com.fasterxml.jackson.datatype.jsr310.DecimalUtils
 import com.fasterxml.jackson.datatype.jsr310.deser.DurationDeserializer
@@ -84,7 +87,15 @@ internal object TockKMongoConfiguration {
             addDeserializer(ZoneId::class, JSR310StringParsableDeserializer.ZONE_ID)
             addSerializer(ZoneOffset::class, ToStringSerializer(ZoneOffset::class.java))
             addDeserializer(ZoneOffset::class, JSR310StringParsableDeserializer.ZONE_OFFSET)
-            addSerializer(Duration::class, DurationSerializer.INSTANCE)
+            if (isDocumentDB()) {
+                addSerializer(Duration::class, object : StdScalarSerializer<Duration>(Duration::class.java) {
+                    override fun serialize(duration: Duration?, generator: JsonGenerator?, provider: SerializerProvider?) {
+                        generator?.writeString(duration?.toString())
+                    }
+                })
+            } else {
+                addSerializer(Duration::class, DurationSerializer.INSTANCE)
+            }
             addDeserializer(Duration::class, object : StdScalarDeserializer<Duration>(Duration::class.java) {
 
                 override fun deserialize(parser: JsonParser, context: DeserializationContext): Duration? {
