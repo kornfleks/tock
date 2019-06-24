@@ -173,7 +173,7 @@ internal val asyncMongoClient: com.mongodb.reactivestreams.client.MongoClient by
             }
             .apply {
                 if (mongoUrl.sslEnabled == true) {
-                    setSslProperties(mongoCaCert)
+                    if (devEnvironment) setSslProperties(mongoCaCert)
                     streamFactoryFactory(NettyStreamFactoryFactory.builder().build())
                 }
             }

@@ -1,17 +1,17 @@
 package fr.vsct.tock.shared.security
 
+import fr.vsct.tock.shared.error
+import mu.KotlinLogging
 import java.io.File
 import java.security.cert.X509Certificate
 import java.security.KeyStore
 import java.io.FileOutputStream
 import java.security.cert.CertificateFactory
-import java.rmi.server.RMISocketFactory.getSocketFactory
 import java.security.KeyManagementException
 import java.security.NoSuchAlgorithmException
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
@@ -21,6 +21,8 @@ private const val KEY_STORE_PROVIDER = "SUN"
 private const val KEY_STORE_FILE_PREFIX = "sys-connect-via-ssl-test-cacerts"
 private const val KEY_STORE_FILE_SUFFIX = ".jks"
 private const val DEFAULT_KEY_STORE_PASSWORD = "changeit"
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Set SSL property to integrate the PEM certificate.
@@ -33,8 +35,7 @@ internal fun setSslProperties(pemCertificateName: String){
             System.setProperty("javax.net.ssl.trustStore", it)
         }
     } catch (e: Exception) {
-
-        e.printStackTrace()
+        logger.error(e)
     }
 
     System.setProperty("javax.net.ssl.trustStoreType", KEY_STORE_TYPE)
@@ -65,10 +66,10 @@ internal fun getNoopSslContext(): SSLContext {
 
         }), SecureRandom())
     } catch (e: NoSuchAlgorithmException) {
-        error("Couldn't create SSL Context for MongoDB connection")
+        logger.error("Couldn't create SSL Context for MongoDB connection")
         throw RuntimeException(e)
     } catch (e: KeyManagementException) {
-        error("Couldn't create SSL Context for MongoDB connection")
+        logger.error("Couldn't create SSL Context for MongoDB connection")
         throw RuntimeException(e)
     }
 
