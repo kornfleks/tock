@@ -18,6 +18,7 @@ package fr.vsct.tock.bot.connector.ga
 
 import fr.vsct.tock.bot.connector.ga.model.GAIntent
 import fr.vsct.tock.bot.connector.ga.model.request.GAArgumentBuiltInName
+import fr.vsct.tock.bot.connector.ga.model.request.GAInputType.URL
 import fr.vsct.tock.bot.connector.ga.model.request.GAInputType.VOICE
 import fr.vsct.tock.bot.connector.ga.model.request.GARequest
 import fr.vsct.tock.bot.connector.ga.model.request.GASignInStatus
@@ -35,7 +36,6 @@ import fr.vsct.tock.bot.engine.stt.SttService
 import fr.vsct.tock.bot.engine.user.PlayerId
 import fr.vsct.tock.bot.engine.user.PlayerType
 import fr.vsct.tock.bot.engine.user.UserLocation
-import fr.vsct.tock.translator.UserInterfaceType
 
 /**
  *
@@ -48,8 +48,7 @@ internal object WebhookActionConverter {
     ): Event {
         val eventState = message.getEventState()
         val userInterface = eventState.userInterface
-        //for google home, use conversationId
-        val userId = if (userInterface == UserInterfaceType.voiceAssistant) message.conversation.conversationId else message.user.userId
+        val userId = message.conversation.conversationId
         val playerId = PlayerId(userId, PlayerType.user)
         val botId = PlayerId(applicationId, PlayerType.bot)
 
@@ -84,6 +83,18 @@ internal object WebhookActionConverter {
                         state = eventState
                     )
                 }
+            } else if (input.rawInputs.any { it.inputType == URL }) {
+                return SendChoice(
+                    playerId,
+                    applicationId,
+                    botId,
+                    input.intent.substringAfter("tock."),
+                    parameters = input.arguments?.filter { it.textValue != null }?.map {
+                        it.name to it.textValue!!
+                    }?.toMap().orEmpty(),
+                    state = eventState
+                )
+
             }
 
             fun Event.setEventState(): Event {

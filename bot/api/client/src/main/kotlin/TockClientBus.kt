@@ -16,6 +16,8 @@
 
 package fr.vsct.tock.bot.api.client
 
+import fr.vsct.tock.bot.api.model.BotResponse
+import fr.vsct.tock.bot.api.model.ResponseContext
 import fr.vsct.tock.bot.api.model.UserRequest
 import fr.vsct.tock.bot.api.model.context.Entity
 import fr.vsct.tock.bot.api.model.message.bot.BotMessage
@@ -24,12 +26,11 @@ import fr.vsct.tock.bot.api.model.message.bot.CustomMessage
 import fr.vsct.tock.bot.api.model.message.bot.I18nText
 import fr.vsct.tock.bot.api.model.message.bot.Sentence
 import fr.vsct.tock.bot.api.model.message.user.UserMessage
+import fr.vsct.tock.bot.api.model.websocket.RequestData
 import fr.vsct.tock.bot.connector.ConnectorMessage
 import fr.vsct.tock.bot.connector.ConnectorType
 import fr.vsct.tock.bot.definition.Intent
 import fr.vsct.tock.bot.definition.IntentAware
-import fr.vsct.tock.bot.definition.StoryHandlerDefinition
-import fr.vsct.tock.bot.definition.StoryStep
 import fr.vsct.tock.bot.engine.user.PlayerId
 import fr.vsct.tock.shared.jackson.AnyValueWrapper
 import fr.vsct.tock.translator.I18nKeyProvider
@@ -42,9 +43,13 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class TockClientBus(
     override val botDefinition: ClientBotDefinition,
+    val requestId: String,
     val request: UserRequest,
-    val sendAnswer: (List<BotMessage>) -> Unit
+    val sendAnswer: (BotResponse) -> Unit
 ) : ClientBus {
+
+    constructor(botDefinition: ClientBotDefinition, data: RequestData, sendAnswer: (BotResponse) -> Unit) :
+        this(botDefinition, data.requestId, data.botRequest!!, sendAnswer)
 
     override val applicationId: String = request.context.applicationId
     override val userId: PlayerId = request.context.userId
@@ -57,16 +62,25 @@ class TockClientBus(
     override val contextId: String? = request.context.userId.id
     private var _currentAnswerIndex: Int = 0
     override val currentAnswerIndex: Int get() = _currentAnswerIndex
-    override val entities: List<Entity> = request.entities
+    override val entities: MutableList<Entity> = request.entities.toMutableList()
     override val message: UserMessage = request.message
 
     private val context = ClientBusContext()
     private val messages: MutableList<BotMessage> = CopyOnWriteArrayList()
 
-    //TODO
-    override var step: StoryStep<out StoryHandlerDefinition>?
-        get() = null
-        set(value) {}
+    override lateinit var story: ClientStoryDefinition
+    override var step: ClientStep? = null
+
+    override val stepName: String? = null
+
+    override fun handle() {
+        story =
+            botDefinition.stories.find { it.storyId == request.storyId }
+                ?: botDefinition.stories.find { intent != null && it.isStarterIntent(intent.wrappedIntent()) }
+                    ?: botDefinition.unknownStory
+        step = story.steps.find { it.name == request.step }
+        story.handler.handle(this)
+    }
 
     override fun defaultDelay(answerIndex: Int): Long = 0
 
@@ -88,7 +102,7 @@ class TockClientBus(
 
     override fun endRawText(plainText: CharSequence?, delay: Long): ClientBus {
         addMessage(plainText, delay)
-        sendAnswer(messages)
+        answer(messages)
         return this
     }
 
@@ -99,8 +113,20 @@ class TockClientBus(
 
     override fun end(card: Card): ClientBus {
         send(card)
-        sendAnswer(messages)
+        answer(messages)
         return this
+    }
+
+    private fun answer(messages: List<BotMessage>) {
+        sendAnswer(
+            BotResponse(
+                messages,
+                story.storyId,
+                step?.name,
+                entities,
+                ResponseContext(requestId)
+            )
+        )
     }
 
     override fun send(card: Card): ClientBus {

@@ -15,8 +15,10 @@
  */
 
 import {Component, EventEmitter, Input, OnInit, Output} from "@angular/core";
-import {BotApplicationConfiguration, ConnectorType, UserInterfaceType} from "../../core/model/configuration";
+import {BotApplicationConfiguration, ConnectorType} from "../../core/model/configuration";
 import {BotSharedService} from "../../shared/bot-shared.service";
+import {StateService} from "../../core-nlp/state.service";
+import {BotConfigurationService} from "../../core/bot-configuration.service";
 
 @Component({
   selector: 'tock-bot-configuration',
@@ -37,7 +39,10 @@ export class BotConfigurationComponent implements OnInit {
   connectorTypes: ConnectorType[] = [];
   connectorTypesAndRestType: ConnectorType[] = [];
 
-  constructor(public botSharedService: BotSharedService) {
+  constructor(
+    public botSharedService: BotSharedService,
+    private state: StateService,
+    private botConfiguration: BotConfigurationService) {
   }
 
   ngOnInit(): void {
@@ -46,13 +51,15 @@ export class BotConfigurationComponent implements OnInit {
       .getConnectorTypes()
       .subscribe(
         confConf => {
-          const c = confConf.map(it => it.connectorType);
+          const c = confConf.map(it => it.connectorType).sort((a, b) => a.id.localeCompare(b.id));
+          ;
           this.connectorTypes = c;
           const rest = c.find(conn => conn.isRest());
           this.connectorTypesAndRestType = c.filter(conn => !conn.isRest());
           this.connectorTypesAndRestType.push(rest);
           if (!this.configuration._id && c.length > 0) {
             this.configuration.connectorType = c[0];
+            this.changeConnectorType();
           }
         }
       )
@@ -64,5 +71,10 @@ export class BotConfigurationComponent implements OnInit {
 
   update() {
     this.onValidate.emit(true);
+  }
+
+  changeConnectorType() {
+    this.configuration.path = this.botConfiguration.findValidPath(this.configuration.connectorType);
+    this.configuration.applicationId = this.botConfiguration.findValidId(this.configuration.name);
   }
 }

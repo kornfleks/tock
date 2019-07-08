@@ -23,27 +23,83 @@ import fr.vsct.tock.bot.api.model.message.bot.Card
 import fr.vsct.tock.bot.api.model.message.bot.I18nText
 import fr.vsct.tock.bot.api.model.message.user.UserMessage
 import fr.vsct.tock.bot.engine.Bus
+import fr.vsct.tock.nlp.entity.Value
 import fr.vsct.tock.translator.I18nLabelValue
 import fr.vsct.tock.translator.RawString
 import fr.vsct.tock.translator.TranslatedString
 
+/**
+ * A new bus instance is created for each user request.
+ *
+ * The bus is used by bot implementations to reply to the user request.
+ */
 interface ClientBus : Bus<ClientBus> {
 
+    /**
+     * The bot definition.
+     */
     val botDefinition: ClientBotDefinition
 
-    val entities: List<Entity>
+    /**
+     * The entity list.
+     */
+    val entities: MutableList<Entity>
 
+    /**
+     * The user message.
+     */
     val message: UserMessage
 
-    fun handle() {
-        val story = botDefinition.stories.find { intent?.wrap(it.mainIntent) == true }
-            ?: botDefinition.unknownStory
-        story.handler.handle(this)
-    }
+    /**
+     * The current story.
+     */
+    var story: ClientStoryDefinition
 
+    /**
+     * The current step.
+     */
+    var step: ClientStep?
+
+    /**
+     * Handles the current request.
+     */
+    fun handle()
+
+    /**
+     * Sends a [Card].
+     */
     fun send(card: Card): ClientBus
 
+    /**
+     * Sends a [Card] as last bot answer.
+     */
     fun end(card: Card): ClientBus
+
+    /**
+     * Finds the [Entity] from the specified entity role.
+     */
+    fun entity(role: String): Entity? = entities.find { it.role == role }
+
+    /**
+     * Returns the [Entity] text content from the specified entity role.
+     */
+    fun entityText(role: String): String? = entity(role)?.content
+
+    /**
+     * Returns the corresponding [Entity] [Value] from the specified entity role.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Value> entityValue(role: String): T? = entity(role)?.value as? T
+
+    /**
+     * Removes the entity of the specified role.
+     */
+    fun removeEntity(role: String): Boolean = entities.removeIf { it.role == role }
+
+    /**
+     * Remove the specified entity.
+     */
+    fun removeEntity(entity: Entity): Boolean = entities.remove(entity)
 
     override fun translate(text: CharSequence?, vararg args: Any?): I18nText {
         return if (text.isNullOrBlank()) {

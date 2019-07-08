@@ -18,7 +18,9 @@ package fr.vsct.tock.bot.admin
 
 import com.github.salomonbrys.kodein.instance
 import fr.vsct.tock.bot.admin.answer.AnswerConfiguration
+import fr.vsct.tock.bot.admin.answer.AnswerConfigurationType.builtin
 import fr.vsct.tock.bot.admin.answer.AnswerConfigurationType.script
+import fr.vsct.tock.bot.admin.answer.BuiltInAnswerConfiguration
 import fr.vsct.tock.bot.admin.answer.ScriptAnswerConfiguration
 import fr.vsct.tock.bot.admin.answer.ScriptAnswerVersionedConfiguration
 import fr.vsct.tock.bot.admin.answer.SimpleAnswerConfiguration
@@ -32,6 +34,7 @@ import fr.vsct.tock.bot.admin.dialog.DialogReportQueryResult
 import fr.vsct.tock.bot.admin.kotlin.compiler.KotlinFile
 import fr.vsct.tock.bot.admin.kotlin.compiler.client.KotlinCompilerClient
 import fr.vsct.tock.bot.admin.model.BotAnswerConfiguration
+import fr.vsct.tock.bot.admin.model.BotBuiltinAnswerConfiguration
 import fr.vsct.tock.bot.admin.model.BotDialogRequest
 import fr.vsct.tock.bot.admin.model.BotDialogResponse
 import fr.vsct.tock.bot.admin.model.BotScriptAnswerConfiguration
@@ -59,6 +62,7 @@ import fr.vsct.tock.bot.admin.user.UserReportDAO
 import fr.vsct.tock.bot.connector.rest.client.ConnectorRestClient
 import fr.vsct.tock.bot.connector.rest.client.model.ClientMessageRequest
 import fr.vsct.tock.bot.connector.rest.client.model.ClientSentence
+import fr.vsct.tock.bot.connector.rest.generateRestConnectorPath
 import fr.vsct.tock.bot.engine.dialog.DialogFlowDAO
 import fr.vsct.tock.bot.engine.feature.FeatureDAO
 import fr.vsct.tock.bot.engine.feature.FeatureState
@@ -145,6 +149,9 @@ object BotAdminService {
 
     fun deleteApplicationConfiguration(conf: BotApplicationConfiguration) {
         applicationConfigurationDAO.delete(conf)
+        //delete rest connector if found
+        applicationConfigurationDAO.getConfigurationByPath(generateRestConnectorPath(conf))
+            ?.also { applicationConfigurationDAO.delete(it) }
     }
 
     fun getBotConfigurationById(id: Id<BotApplicationConfiguration>): BotApplicationConfiguration? {
@@ -341,6 +348,7 @@ object BotAdminService {
                     answers?.find { it.answerType == script } as? ScriptAnswerConfiguration,
                     this
                 )
+            is BotBuiltinAnswerConfiguration -> BuiltInAnswerConfiguration(storyHandlerClassName)
             else -> error("unsupported type $this")
         }
 
@@ -461,7 +469,11 @@ object BotAdminService {
                 botConf.botId,
                 story.intent.name
             ).let {
-                if (it == null) {
+                if (it == null || it.currentType == builtin) {
+                    if (it?.currentType == builtin) {
+                        storyDefinitionDAO.delete(it)
+                    }
+
                     //intent change
                     if (storyDefinition?._id != null) {
                         AdminService.createOrGetIntent(
@@ -476,7 +488,7 @@ object BotAdminService {
                         )
                     }
                 } else {
-                    if (it._id != storyDefinition?._id) {
+                    if (story._id != it._id) {
                         badRequest("Story already exists for the intent ${story.intent.name} : ${it.name}")
                     }
                 }
@@ -606,4 +618,32 @@ object BotAdminService {
                     testPlan
                 )
             }
+
+    fun deleteApplication(app: ApplicationDefinition) {
+        applicationConfigurationDAO.getConfigurationsByNamespaceAndNlpModel(
+            app.namespace, app.name
+        ).forEach {
+            applicationConfigurationDAO.delete(it)
+        }
+        //delete stories
+        storyDefinitionDAO.getStoryDefinitionsByNamespaceAndBotId(
+            app.namespace, app.name
+        ).forEach {
+            storyDefinitionDAO.delete(it)
+        }
+    }
+
+    fun changeApplicationName(existingApp: ApplicationDefinition, newApp: ApplicationDefinition) {
+        applicationConfigurationDAO.getConfigurationsByNamespaceAndNlpModel(
+            existingApp.namespace, existingApp.name
+        ).forEach {
+            applicationConfigurationDAO.save(it.copy(botId = newApp.name, nlpModel = newApp.name))
+        }
+        //delete stories
+        storyDefinitionDAO.getStoryDefinitionsByNamespaceAndBotId(
+            existingApp.namespace, existingApp.name
+        ).forEach {
+            storyDefinitionDAO.save(it.copy(botId = newApp.name))
+        }
+    }
 }

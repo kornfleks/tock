@@ -19,6 +19,9 @@ package fr.vsct.tock.duckling.client
 import fr.vsct.tock.nlp.core.service.entity.EntityEvaluator
 import fr.vsct.tock.nlp.core.service.entity.EntityEvaluatorProvider
 import fr.vsct.tock.nlp.core.service.entity.EntityTypeClassifier
+import fr.vsct.tock.shared.booleanProperty
+
+private val ducklingEnabled = booleanProperty("tock_duckling_enabled", true)
 
 /**
  *
@@ -29,11 +32,11 @@ class DucklingEntityEvaluatorProvider : EntityEvaluatorProvider {
 
     override fun getEntityEvaluator(): EntityEvaluator = DucklingParser
 
-    override fun getSupportedEntityTypes(): Set<String> = DucklingDimensions.entityTypes
+    override fun getSupportedEntityTypes(): Set<String> =
+        if (ducklingEnabled) DucklingDimensions.entityTypes else emptySet()
 
     override fun getEntityTypesWithValuesMergeSupport(): Set<String> = DucklingDimensions.mergeSupport
 
-    override fun healthcheck(): Boolean {
-        return DucklingClient.healthcheck()
-    }
+    override fun healthcheck(): Boolean =
+        if (ducklingEnabled) DucklingClient.healthcheck() else true
 }

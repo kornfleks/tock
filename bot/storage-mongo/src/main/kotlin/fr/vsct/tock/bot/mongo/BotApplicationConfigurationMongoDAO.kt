@@ -24,6 +24,7 @@ import fr.vsct.tock.bot.admin.bot.BotApplicationConfiguration_.Companion.Name
 import fr.vsct.tock.bot.admin.bot.BotApplicationConfiguration_.Companion.Namespace
 import fr.vsct.tock.bot.admin.bot.BotApplicationConfiguration_.Companion.NlpModel
 import fr.vsct.tock.bot.admin.bot.BotApplicationConfiguration_.Companion.Parameters
+import fr.vsct.tock.bot.admin.bot.BotApplicationConfiguration_.Companion.Path
 import fr.vsct.tock.bot.admin.bot.BotConfiguration
 import fr.vsct.tock.bot.mongo.MongoBotConfiguration.asyncDatabase
 import fr.vsct.tock.bot.mongo.MongoBotConfiguration.database
@@ -62,13 +63,14 @@ internal object BotApplicationConfigurationMongoDAO : BotApplicationConfiguratio
 
     init {
         col.ensureUniqueIndex(ApplicationId, BotId, Namespace)
+        col.ensureUniqueIndex(Path)
         col.ensureIndex(ApplicationId, BotId)
         col.ensureIndex(Namespace, BotId)
         botCol.ensureUniqueIndex(Name, BotId, Namespace)
     }
 
     override fun listenBotChanges(listener: () -> Unit) {
-        asyncCol.watch { listener() }
+        asyncBotCol.watch { listener() }
     }
 
     override fun listenChanges(listener: () -> Unit) {
@@ -104,6 +106,10 @@ internal object BotApplicationConfigurationMongoDAO : BotApplicationConfiguratio
 
     override fun getConfigurationsByNamespaceAndBotId(namespace: String, botId: String): List<BotApplicationConfiguration> {
         return col.find(Namespace eq namespace, BotId eq botId).toList()
+    }
+
+    override fun getConfigurationByPath(path: String): BotApplicationConfiguration? {
+        return col.findOne(Path eq path)
     }
 
     override fun save(conf: BotApplicationConfiguration): BotApplicationConfiguration {
