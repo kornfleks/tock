@@ -21,7 +21,7 @@
     <parent>
         <groupId>fr.vsct.tock</groupId>
         <artifactId>tock-bot</artifactId>
-        <version>19.3.2-SNAPSHOT</version>
+        <version>19.3.3-SNAPSHOT</version>
     </parent>
 
     <artifactId>bot-test-base</artifactId>
@@ -74,6 +74,12 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-params</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.tutteli.atrium</groupId>
+            <artifactId>atrium-cc-en_GB-robstoll</artifactId>
+            <version>0.8.0</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.mockk</groupId>
