@@ -99,6 +99,11 @@
             </dependency>
             <dependency>
                 <groupId>fr.vsct.tock</groupId>
+                <artifactId>tock-nlp-model-stanford</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>fr.vsct.tock</groupId>
                 <artifactId>tock-nlp-model-storage-mongo</artifactId>
                 <version>${project.version}</version>
             </dependency>

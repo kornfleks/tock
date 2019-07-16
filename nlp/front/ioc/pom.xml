@@ -43,6 +43,10 @@
         </dependency>
         <dependency>
             <groupId>fr.vsct.tock</groupId>
+            <artifactId>tock-nlp-model-stanford</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>fr.vsct.tock</groupId>
             <artifactId>tock-nlp-model-service</artifactId>
         </dependency>
         <dependency>
