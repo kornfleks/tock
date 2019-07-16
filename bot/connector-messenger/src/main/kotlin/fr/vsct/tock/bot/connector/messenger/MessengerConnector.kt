@@ -77,6 +77,7 @@ import org.apache.commons.codec.binary.Hex
 import org.apache.commons.lang3.LocaleUtils
 import java.time.Duration
 import java.time.ZoneOffset
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArraySet
@@ -417,7 +418,7 @@ class MessengerConnector internal constructor(
     fun requestThreadControl(userId: PlayerId, metadata: String? = null): SendResponse? =
         client.requestThreadControl(
             getToken(applicationId),
-            RequestThreadControlRequest(Recipient(userId.id, metadata))
+            RequestThreadControlRequest(Recipient(userId.id), metadata)
         )
 
     /**
@@ -426,16 +427,16 @@ class MessengerConnector internal constructor(
     fun takeThreadControl(userId: PlayerId, metadata: String? = null): SendResponse? =
         client.takeThreadControl(
             getToken(applicationId),
-            TakeThreadControlRequest(Recipient(userId.id, metadata))
+            TakeThreadControlRequest(Recipient(userId.id), metadata)
         )
 
     /**
      * Passes thread control.
      */
-    fun passThreadControl(userId: PlayerId, metadata: String? = null): SendResponse? =
+    fun passThreadControl(userId: PlayerId, targetAppId: String, metadata: String? = null): SendResponse? =
         client.passThreadControl(
             getToken(applicationId),
-            PassThreadControlRequest(Recipient(userId.id, metadata))
+            PassThreadControlRequest(Recipient(userId.id), targetAppId, metadata)
         )
 
     /**
@@ -547,20 +548,23 @@ class MessengerConnector internal constructor(
                 userProfile.lastName,
                 null,
                 ZoneOffset.ofHours(userProfile.timezone),
-                userProfile.locale?.let {
-                    try {
-                        LocaleUtils.toLocale(it)
-                    } catch (e: Exception) {
-                        logger.error(e)
-                        null
-                    }
-                } ?: defaultLocale,
+                userProfile.locale?.let { getLocale(it) } ?: defaultLocale,
                 userProfile.profilePic,
-                userProfile.gender)
+                userProfile.gender,
+                initialLocale = userProfile.locale?.let { getLocale(it) } ?: defaultLocale)
         } catch (e: Exception) {
             logger.error(e)
         }
         return UserPreferences()
+    }
+
+    private fun getLocale(it: String): Locale? {
+        return try {
+            LocaleUtils.toLocale(it)
+        } catch (e: Exception) {
+            logger.error(e)
+            null
+        }
     }
 
     override fun refreshProfile(callback: ConnectorCallback, userId: PlayerId): UserPreferences? =
