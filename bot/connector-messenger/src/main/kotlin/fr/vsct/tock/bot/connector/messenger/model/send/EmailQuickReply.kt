@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package fr.vsct.tock.bot.engine.event
+package fr.vsct.tock.bot.connector.messenger.model.send
 
-import fr.vsct.tock.bot.engine.user.PlayerId
+class EmailQuickReply : QuickReply(QuickReplyContentType.user_email) {
 
-/**
- * A login event, in order to provide account linking.
- * @param checkLogin this param is for revoke token
- */
-class LoginEvent(
-    userId: PlayerId,
-    recipientId: PlayerId,
-    val userToken: String,
-    applicationId: String,
-    val previousUserId: PlayerId = userId,
-    var checkLogin: Boolean = false
-) : OneToOneEvent(userId, recipientId, applicationId)
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is QuickReply) return false
 
+        if (contentType != other.contentType) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return contentType.hashCode()
+    }
+}

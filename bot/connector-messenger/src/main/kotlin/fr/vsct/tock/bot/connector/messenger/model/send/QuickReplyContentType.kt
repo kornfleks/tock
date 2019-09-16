@@ -17,5 +17,5 @@
 package fr.vsct.tock.bot.connector.messenger.model.send
 
 enum class QuickReplyContentType {
-    text, location
+    text, location, user_email
 }
