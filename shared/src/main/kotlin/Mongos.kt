@@ -152,10 +152,15 @@ private val mongoCaCert = property(
  */
 internal val mongoClient: MongoClient by lazy {
     TockKMongoConfiguration.configure()
-    val uri = com.mongodb.MongoClientURI(mongoUrl.toString())
-    val uriWithSSLCustomContext = com.mongodb.MongoClientURI(uri.uri, MongoClientOptions.builder(uri.options).sslContext(getNoopSslContext()))
-    val client = KMongo.createClient(uriWithSSLCustomContext)
-    client
+    return@lazy if (devEnvironment) {
+        val uri = com.mongodb.MongoClientURI(mongoUrl.toString())
+        KMongo.createClient(com.mongodb.MongoClientURI(uri.uri, MongoClientOptions.builder(uri.options).sslContext(getNoopSslContext())))
+    } else {
+        if (mongoUrl.sslEnabled == true) {
+            setSslProperties(mongoCaCert)
+        }
+        KMongo.createClient(mongoUrl)
+    }
 }
 
 /**
@@ -167,13 +172,13 @@ internal val asyncMongoClient: com.mongodb.reactivestreams.client.MongoClient by
         MongoClientSettings.builder()
             .applyConnectionString(mongoUrl)
             .applyToSslSettings {
-                if (mongoUrl.sslEnabled == true && mongoUrl.sslInvalidHostnameAllowed == true) {
+                if (devEnvironment && mongoUrl.sslEnabled == true && mongoUrl.sslInvalidHostnameAllowed == true) {
                     it.context(getNoopSslContext())
                 }
             }
             .apply {
                 if (mongoUrl.sslEnabled == true) {
-                    if (devEnvironment) setSslProperties(mongoCaCert)
+                    setSslProperties(mongoCaCert)
                     streamFactoryFactory(NettyStreamFactoryFactory.builder().build())
                 }
             }
