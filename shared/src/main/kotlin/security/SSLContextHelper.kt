@@ -1,6 +1,7 @@
 package fr.vsct.tock.shared.security
 
 import fr.vsct.tock.shared.error
+import fr.vsct.tock.shared.resourceAsStream
 import mu.KotlinLogging
 import java.io.File
 import java.security.cert.X509Certificate
@@ -14,6 +15,7 @@ import java.security.cert.CertificateException
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
+import java.io.FileInputStream
 
 
 private const val KEY_STORE_TYPE = "JKS"
@@ -94,8 +96,7 @@ private fun createKeyStoreFile(pemCertificateName: String): String? {
 @Throws(Exception::class)
 private fun createCertificate(pemCertificateName: String): X509Certificate {
     val certFactory = CertificateFactory.getInstance("X.509")
-    val url = File(pemCertificateName).toURI().toURL() ?: throw Exception()
-    url.openStream().use({ certInputStream -> return certFactory.generateCertificate(certInputStream) as X509Certificate })
+    resourceAsStream(pemCertificateName).use { certInputStream -> return certFactory.generateCertificate(certInputStream) as X509Certificate }
 }
 
 /**
@@ -107,7 +108,10 @@ private fun createKeyStoreFile(rootX509Certificate: X509Certificate): File? {
     val keyStoreFile = File.createTempFile(KEY_STORE_FILE_PREFIX, KEY_STORE_FILE_SUFFIX)
     FileOutputStream(keyStoreFile.getPath()).use { fos ->
         val ks = KeyStore.getInstance(KEY_STORE_TYPE, KEY_STORE_PROVIDER)
-        ks.load(null)
+        val rootCAFilePath = System.getProperty("java.home") + "/lib/security/cacerts"
+        FileInputStream(rootCAFilePath).use { fis ->
+            ks.load(fis, "changeit".toCharArray())
+        }
         ks.setCertificateEntry("rootCaCertificate", rootX509Certificate)
         ks.store(fos, DEFAULT_KEY_STORE_PASSWORD.toCharArray())
     }
