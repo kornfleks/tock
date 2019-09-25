@@ -96,7 +96,8 @@ private fun createKeyStoreFile(pemCertificateName: String): String? {
 @Throws(Exception::class)
 private fun createCertificate(pemCertificateName: String): X509Certificate {
     val certFactory = CertificateFactory.getInstance("X.509")
-    resourceAsStream(pemCertificateName).use { certInputStream -> return certFactory.generateCertificate(certInputStream) as X509Certificate }
+    val url = File(pemCertificateName).toURI().toURL() ?: throw Exception()
+    url.openStream().use { certInputStream -> return certFactory.generateCertificate(certInputStream) as X509Certificate }
 }
 
 /**
