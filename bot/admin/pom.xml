@@ -33,6 +33,7 @@
         <module>test</module>
         <module>kotlin-compiler</module>
         <module>server</module>
+        <module>server-with-build-worker</module>
         <module>web</module>
     </modules>
 
