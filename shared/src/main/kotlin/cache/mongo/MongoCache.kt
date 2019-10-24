@@ -27,8 +27,8 @@ import mu.KotlinLogging
 import org.litote.kmongo.Id
 import org.litote.kmongo.and
 import org.litote.kmongo.deleteOne
-import fr.vsct.tock.shared.ensureIndex
-import fr.vsct.tock.shared.ensureUniqueIndex
+import ai.tock.shared.ensureIndex
+import ai.tock.shared.ensureUniqueIndex
 import org.litote.kmongo.eq
 import org.litote.kmongo.findOne
 import org.litote.kmongo.getCollection

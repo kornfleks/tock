@@ -1,7 +1,6 @@
-package fr.vsct.tock.shared.security
+package ai.tock.shared.security
 
-import fr.vsct.tock.shared.error
-import fr.vsct.tock.shared.resourceAsStream
+import ai.tock.shared.error
 import mu.KotlinLogging
 import java.io.File
 import java.security.cert.X509Certificate

@@ -62,7 +62,7 @@ import org.litote.kmongo.`in`
 import org.litote.kmongo.aggregate
 import org.litote.kmongo.all
 import org.litote.kmongo.and
-import org.litote.kmongo.ensureIndex
+import ai.tock.shared.ensureIndex
 import org.litote.kmongo.eq
 import org.litote.kmongo.find
 import org.litote.kmongo.findOne

@@ -139,7 +139,7 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>fr.vsct.tock</groupId>
+                <groupId>ai.tock</groupId>
                 <artifactId>tock-nlp-build-model-worker</artifactId>
                 <version>${project.version}</version>
             </dependency>

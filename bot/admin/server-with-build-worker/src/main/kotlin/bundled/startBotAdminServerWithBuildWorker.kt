@@ -1,13 +1,13 @@
-package fr.vsct.tock.bot.admin.bundled
+package ai.tock.bot.admin.bundled
 
 import com.github.salomonbrys.kodein.Kodein
-import fr.vsct.tock.bot.BotIoc
-import fr.vsct.tock.bot.admin.BotAdminVerticle
-import fr.vsct.tock.nlp.build.BuildModelWorkerVerticle
-import fr.vsct.tock.nlp.build.CleanupModelWorkerVerticle
-import fr.vsct.tock.nlp.build.HealthCheckVerticle
-import fr.vsct.tock.nlp.front.ioc.FrontIoc
-import fr.vsct.tock.shared.vertx.vertx
+import ai.tock.bot.BotIoc
+import ai.tock.bot.admin.BotAdminVerticle
+import ai.tock.nlp.build.BuildModelWorkerVerticle
+import ai.tock.nlp.build.CleanupModelWorkerVerticle
+import ai.tock.nlp.build.HealthCheckVerticle
+import ai.tock.nlp.front.ioc.FrontIoc
+import ai.tock.shared.vertx.vertx
 import io.vertx.core.DeploymentOptions
 
 fun main() {

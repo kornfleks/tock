@@ -43,8 +43,8 @@ import de.undercouch.bson4jackson.types.Decimal128
 import ai.tock.shared.jackson.addDeserializer
 import ai.tock.shared.jackson.addSerializer
 import ai.tock.shared.jackson.jacksonAdditionalModules
-import fr.vsct.tock.shared.security.getNoopSslContext
-import fr.vsct.tock.shared.security.setSslProperties
+import ai.tock.shared.security.getNoopSslContext
+import ai.tock.shared.security.setSslProperties
 import mu.KotlinLogging
 import org.bson.BsonDocument
 import org.bson.conversions.Bson
