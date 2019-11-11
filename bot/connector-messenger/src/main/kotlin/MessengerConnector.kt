@@ -43,6 +43,7 @@ import ai.tock.bot.connector.messenger.model.send.SenderAction.typing_off
 import ai.tock.bot.connector.messenger.model.send.SenderAction.typing_on
 import ai.tock.bot.connector.messenger.model.send.UrlPayload
 import ai.tock.bot.connector.messenger.model.webhook.CallbackRequest
+import ai.tock.bot.connector.messenger.model.webhook.Webhook
 import ai.tock.bot.definition.IntentAware
 import ai.tock.bot.definition.StoryHandlerDefinition
 import ai.tock.bot.definition.StoryStep
@@ -56,6 +57,7 @@ import ai.tock.bot.engine.event.Event
 import ai.tock.bot.engine.event.MarkSeenEvent
 import ai.tock.bot.engine.event.TypingOffEvent
 import ai.tock.bot.engine.event.TypingOnEvent
+import ai.tock.bot.engine.monitoring.RequestTimerData
 import ai.tock.bot.engine.monitoring.logError
 import ai.tock.bot.engine.user.PlayerId
 import ai.tock.bot.engine.user.PlayerType.bot
@@ -90,7 +92,7 @@ import javax.crypto.spec.SecretKeySpec
  * Contains built-in checks to ensure that two [MessageRequest] for the same recipient are sent sequentially.
  */
 class MessengerConnector internal constructor(
-    connectorId: String,
+    private val connectorId: String,
     private val applicationId: String,
     private val path: String,
     private val pageId: String,
@@ -106,7 +108,8 @@ class MessengerConnector internal constructor(
 
     companion object {
         private val logger = KotlinLogging.logger {}
-        private val pageConnectorIdMap: MutableMap<String, String> = ConcurrentHashMap()
+        private val pageIdConnectorIdMap: MutableMap<String, String> = ConcurrentHashMap()
+        private val pageIdConnectorControllerMap: MutableMap<String, ConnectorController> = ConcurrentHashMap()
         private val connectorIdTokenMap: MutableMap<String, String> = ConcurrentHashMap()
         private val connectorIdApplicationIdMap: MutableMap<String, String> = ConcurrentHashMap()
         private val connectors: MutableSet<MessengerConnector> = CopyOnWriteArraySet<MessengerConnector>()
@@ -122,7 +125,7 @@ class MessengerConnector internal constructor(
         }
 
         fun getConnectorById(connectorId: String): MessengerConnector? {
-            return connectors.firstOrNull { it.applicationId == connectorIdApplicationIdMap[connectorId] }
+            return connectors.firstOrNull { it.connectorId == connectorId }
         }
 
         fun healthcheck(): Boolean {
@@ -131,7 +134,7 @@ class MessengerConnector internal constructor(
     }
 
     init {
-        pageConnectorIdMap[pageId] = connectorId
+        pageIdConnectorIdMap[pageId] = connectorId
         connectorIdTokenMap[connectorId] = token
         connectorIdApplicationIdMap[connectorId] = applicationId
         connectors.add(this)
@@ -181,76 +184,7 @@ class MessengerConnector internal constructor(
                         try {
                             logger.debug { "Facebook request input : $body" }
                             val request = mapper.readValue<CallbackRequest>(body)
-
-                            vertx.executeBlocking<Void>({
-                                try {
-                                    request.entry.forEach { entry ->
-                                        try {
-                                            if (entry.messaging?.isNotEmpty() == true) {
-
-                                                val applicationId = pageConnectorIdMap.getValue(entry.id)
-                                                    .let {
-                                                        if (oldConnectorIdBehaviour) {
-                                                            connectorIdApplicationIdMap.getValue(it)
-                                                        } else {
-                                                            it
-                                                        }
-                                                    }
-                                                entry.messaging.forEach { m ->
-                                                    if (m != null) {
-                                                        try {
-                                                            val event = WebhookActionConverter.toEvent(m, applicationId)
-                                                            if (event != null) {
-                                                                controller.handle(
-                                                                    event,
-                                                                    ConnectorData(
-                                                                        MessengerConnectorCallback(event.applicationId),
-                                                                        m.priorMessage?.identifier?.let {
-                                                                            PlayerId(
-                                                                                it,
-                                                                                temporary
-                                                                            )
-                                                                        }
-                                                                    )
-                                                                )
-                                                            } else {
-                                                                logger.logError(
-                                                                    "unable to convert $m to event",
-                                                                    requestTimerData
-                                                                )
-                                                            }
-                                                        } catch (e: Throwable) {
-                                                            try {
-                                                                logger.logError(e, requestTimerData)
-                                                                controller.errorMessage(
-                                                                    m.playerId(bot),
-                                                                    applicationId,
-                                                                    m.recipientId(bot)
-                                                                ).let {
-                                                                    sendEvent(it)
-                                                                    endTypingAnswer(it)
-                                                                }
-                                                            } catch (t: Throwable) {
-                                                                logger.error(e)
-                                                            }
-                                                        }
-                                                    } else {
-                                                        logger.error { "null message: $body" }
-                                                    }
-                                                }
-                                            } else {
-                                                logger.warn { "empty message for entry $entry" }
-                                            }
-                                        } catch (e: Throwable) {
-                                            logger.logError(e, requestTimerData)
-                                        }
-                                    }
-                                } catch (e: Throwable) {
-                                    logger.logError(e, requestTimerData)
-                                } finally {
-                                    it.complete()
-                                }
-                            }, false, {})
+                            handleRequest(controller, request, requestTimerData)
                         } catch (t: Throwable) {
                             logger.logError(t, requestTimerData)
                         }
@@ -269,6 +203,85 @@ class MessengerConnector internal constructor(
                     }
                 }
             }
+        }
+        pageIdConnectorControllerMap[pageId] = controller
+    }
+
+    private fun handleRequest(controller: ConnectorController, request: CallbackRequest, requestTimerData: RequestTimerData) {
+        vertx.executeBlocking<Void>({
+            try {
+                request.entry.forEach { entry ->
+                    try {
+                        if (entry.messaging?.isNotEmpty() == true) {
+
+                            val applicationId = pageIdConnectorIdMap.getValue(entry.id)
+                                .let {
+                                    if (oldConnectorIdBehaviour) {
+                                        connectorIdApplicationIdMap.getValue(it)
+                                    } else {
+                                        it
+                                    }
+                                }
+                            entry.messaging.forEach { m ->
+                                if (m != null) {
+                                    try {
+                                        handleMessage(controller, m, requestTimerData)
+                                    } catch (e: Throwable) {
+                                        try {
+                                            logger.logError(e, requestTimerData)
+                                            controller.errorMessage(
+                                                m.playerId(bot),
+                                                applicationId,
+                                                m.recipientId(bot)
+                                            ).let {
+                                                sendEvent(it)
+                                                endTypingAnswer(it)
+                                            }
+                                        } catch (t: Throwable) {
+                                            logger.error(e)
+                                        }
+                                    }
+                                } else {
+                                    logger.error { "null message" }
+                                }
+                            }
+                        } else {
+                            logger.warn { "empty message for entry $entry" }
+                        }
+                    } catch (e: Throwable) {
+                        logger.logError(e, requestTimerData)
+                    }
+                }
+            } catch (e: Throwable) {
+                logger.logError(e, requestTimerData)
+            } finally {
+                it.complete()
+            }
+        }, false, {})
+    }
+
+    private fun handleMessage(controller: ConnectorController, webhook: Webhook, requestTimerData: RequestTimerData) {
+        val event = WebhookActionConverter.toEvent(webhook, applicationId)
+        if (event != null) {
+            //retrieve the controller from the page id
+            val c = webhook.sender?.id?.let { pageId -> pageIdConnectorControllerMap[pageId] } ?: controller
+            c.handle(
+                event,
+                ConnectorData(
+                    MessengerConnectorCallback(event.applicationId),
+                    webhook.priorMessage?.identifier?.let {
+                        PlayerId(
+                            it,
+                            temporary
+                        )
+                    }
+                )
+            )
+        } else {
+            logger.logError(
+                "unable to convert $webhook to event",
+                requestTimerData
+            )
         }
     }
 
@@ -604,7 +617,7 @@ class MessengerConnector internal constructor(
     private fun getToken(connectorId: String): String =
         connectorIdTokenMap[connectorId]
         //TODO remove this when backward compatibility is no more assured
-            ?: pageConnectorIdMap[connectorId]?.let {
+            ?: pageIdConnectorIdMap[connectorId]?.let {
                 logger.warn { "use pageId as connectorId for $connectorId" }
                 connectorIdTokenMap[it]
             }
