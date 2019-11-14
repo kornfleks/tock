@@ -75,6 +75,7 @@ import ai.tock.shared.security.initEncryptor
 import ai.tock.shared.supportedLanguages
 import ai.tock.shared.vertx.RequestLogger
 import ai.tock.shared.vertx.WebVerticle
+import ai.tock.shared.vertx.makeDetailedHealthcheck
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.vertx.core.Handler
 import io.vertx.core.http.HttpMethod.GET
@@ -936,6 +937,7 @@ open class AdminVerticle : WebVerticle() {
                     }
                 }
             }
+            logger.info { "$webRoot/doc/admin.yaml" }
             router.get("/doc/admin.yaml").handler { context ->
                 context.vertx().fileSystem().readFile("$webRoot/doc/admin.yaml") {
                     if (it.succeeded()) {
@@ -982,8 +984,10 @@ open class AdminVerticle : WebVerticle() {
         configureStaticHandling()
     }
 
-    override fun healthcheck(): (RoutingContext) -> Unit {
+    override fun defaultHealthcheck(): (RoutingContext) -> Unit {
         return { it.response().end() }
     }
+
+    override fun detailedHealthcheck(): (RoutingContext) -> Unit = makeDetailedHealthcheck()
 
 }

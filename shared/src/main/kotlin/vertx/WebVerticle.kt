@@ -128,7 +128,14 @@ abstract class WebVerticle : AbstractVerticle() {
 
     abstract fun configure()
 
-    abstract fun healthcheck(): (RoutingContext) -> Unit
+    protected open fun healthcheck() =
+        if (booleanProperty("tock_detailed_healthcheck_enabled", false))
+            detailedHealthcheck()
+        else defaultHealthcheck()
+
+    abstract fun defaultHealthcheck(): (RoutingContext) -> Unit
+
+    abstract fun detailedHealthcheck(): (RoutingContext) -> Unit
 
     override fun start(promise: Promise<Void>) {
         vertx.executeBlocking<Unit>(

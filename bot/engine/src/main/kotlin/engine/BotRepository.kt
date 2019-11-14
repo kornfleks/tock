@@ -74,7 +74,7 @@ object BotRepository {
     internal val botProviders: MutableMap<BotProviderId, BotProvider> = ConcurrentHashMap()
     internal val storyHandlerListeners: MutableList<StoryHandlerListener> = mutableListOf()
     private val nlpListeners: MutableList<NlpListener> = mutableListOf(BuiltInKeywordListener)
-    private val nlpClient: NlpClient get() = injector.provide()
+    public val nlpClient: NlpClient get() = injector.provide()
     private val nlpController: NlpController get() = injector.provide()
     private val executor: Executor get() = injector.provide()
     internal val botAnswerInterceptors: MutableList<BotAnswerInterceptor> = mutableListOf()
@@ -95,7 +95,7 @@ object BotRepository {
         ConcurrentHashMap()
 
     @Volatile
-    private var botsInstalled: Boolean = false
+    public var botsInstalled: Boolean = false
 
     /**
      * Request timer for connectors.

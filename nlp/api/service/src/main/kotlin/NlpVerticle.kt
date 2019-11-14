@@ -35,6 +35,7 @@ import ai.tock.shared.property
 import ai.tock.shared.security.auth.TockAuthProvider
 import ai.tock.shared.security.initEncryptor
 import ai.tock.shared.vertx.WebVerticle
+import ai.tock.shared.vertx.makeDetailedHealthcheck
 import io.vertx.ext.web.RoutingContext
 import mu.KLogger
 import mu.KotlinLogging
@@ -188,11 +189,18 @@ class NlpVerticle : WebVerticle() {
         }
     }
 
-    override fun healthcheck(): (RoutingContext) -> Unit {
+    override fun defaultHealthcheck(): (RoutingContext) -> Unit {
         return {
             executor.executeBlocking {
                 it.response().setStatusCode(if (FrontClient.healthcheck()) 200 else 500).end()
             }
         }
     }
+
+    override fun detailedHealthcheck(): (RoutingContext) -> Unit = makeDetailedHealthcheck(
+        listOf(
+            Pair("duckling_service", { FrontClient.healthcheck() })
+        )
+    )
+
 }
