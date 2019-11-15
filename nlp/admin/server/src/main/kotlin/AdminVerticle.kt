@@ -937,7 +937,6 @@ open class AdminVerticle : WebVerticle() {
                     }
                 }
             }
-            logger.info { "$webRoot/doc/admin.yaml" }
             router.get("/doc/admin.yaml").handler { context ->
                 context.vertx().fileSystem().readFile("$webRoot/doc/admin.yaml") {
                     if (it.succeeded()) {

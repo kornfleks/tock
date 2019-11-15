@@ -133,8 +133,14 @@ abstract class WebVerticle : AbstractVerticle() {
             detailedHealthcheck()
         else defaultHealthcheck()
 
+    /**
+     * Provide basic health information: mainly through HTTP status code
+     */
     abstract fun defaultHealthcheck(): (RoutingContext) -> Unit
 
+    /**
+     * Provide enhanced information: HTTP response has JSON body with health status of resources
+     */
     abstract fun detailedHealthcheck(): (RoutingContext) -> Unit
 
     override fun start(promise: Promise<Void>) {
