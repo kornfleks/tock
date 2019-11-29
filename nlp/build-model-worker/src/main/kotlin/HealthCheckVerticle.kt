@@ -16,9 +16,13 @@
 
 package ai.tock.nlp.build
 
+import ai.tock.shared.injector
 import ai.tock.shared.jackson.mapper
+import ai.tock.shared.pingMongoDatabase
 import ai.tock.shared.vertx.WebVerticle
 import ai.tock.shared.vertx.makeDetailedHealthcheck
+import com.github.salomonbrys.kodein.instance
+import com.mongodb.MongoClient
 import io.vertx.ext.web.RoutingContext
 
 /**
@@ -28,6 +32,7 @@ class HealthCheckVerticle(
     val buildVerticle: BuildModelWorkerVerticle
 ) : WebVerticle() {
 
+    private val mongoClient: MongoClient by injector.instance()
     override fun configure() {
         //do nothing
     }
@@ -44,7 +49,11 @@ class HealthCheckVerticle(
         }
 
     override fun detailedHealthcheck(): (RoutingContext) -> Unit = makeDetailedHealthcheck(
-        selfCheck = { !buildVerticle.canAnalyse.get() }
+        listOf(
+            Pair("tock_front_database", { pingMongoDatabase(mongoClient.getDatabase("tock_front")) }),
+            Pair("tock_model_database", { pingMongoDatabase(mongoClient.getDatabase("tock_model")) })
+        ),
+        selfCheck = { buildVerticle.canAnalyse.get() }
     )
 
 }

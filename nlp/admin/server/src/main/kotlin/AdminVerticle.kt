@@ -64,6 +64,7 @@ import ai.tock.shared.name
 import ai.tock.shared.namespace
 import ai.tock.shared.property
 import ai.tock.shared.provide
+import ai.tock.shared.pingMongoDatabase
 import ai.tock.shared.security.TockUser
 import ai.tock.shared.security.TockUserRole
 import ai.tock.shared.security.TockUserRole.admin
@@ -76,6 +77,8 @@ import ai.tock.shared.supportedLanguages
 import ai.tock.shared.vertx.RequestLogger
 import ai.tock.shared.vertx.WebVerticle
 import ai.tock.shared.vertx.makeDetailedHealthcheck
+import com.github.salomonbrys.kodein.instance
+import com.mongodb.MongoClient
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.vertx.core.Handler
 import io.vertx.core.http.HttpMethod.GET
@@ -94,6 +97,8 @@ import java.util.Locale
 open class AdminVerticle : WebVerticle() {
 
     override val logger: KLogger = KotlinLogging.logger {}
+
+    private val mongoClient: MongoClient by injector.instance()
 
     override val rootPath: String = "/rest/admin"
 
@@ -987,6 +992,19 @@ open class AdminVerticle : WebVerticle() {
         return { it.response().end() }
     }
 
-    override fun detailedHealthcheck(): (RoutingContext) -> Unit = makeDetailedHealthcheck()
+    override fun detailedHealthcheck(): (RoutingContext) -> Unit = makeDetailedHealthcheck(
+        listOf(
+            Pair("duckling_service", { FrontClient.healthcheck() }),
+            Pair("tock_front_database", {
+                pingMongoDatabase(mongoClient.getDatabase(System.getenv("tock_front_mongo_db")))
+            }),
+            Pair("tock_model_database", {
+                pingMongoDatabase(mongoClient.getDatabase(System.getenv("tock_model_mongo_db")))
+            }),
+            Pair("tock_bot_database", {
+                pingMongoDatabase(mongoClient.getDatabase(System.getenv("tock_bot_mongo_db")))
+            })
+        )
+    )
 
 }

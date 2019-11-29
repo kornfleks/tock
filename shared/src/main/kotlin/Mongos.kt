@@ -47,6 +47,7 @@ import ai.tock.shared.security.getNoopSslContext
 import ai.tock.shared.security.setSslProperties
 import mu.KotlinLogging
 import org.bson.BsonDocument
+import org.bson.Document
 import org.bson.conversions.Bson
 import org.litote.kmongo.KMongo
 import org.litote.kmongo.ascending
@@ -59,6 +60,7 @@ import org.litote.kmongo.util.CollectionNameFormatter
 import org.litote.kmongo.util.KMongoConfiguration
 import org.litote.kmongo.util.KMongoConfiguration.registerBsonModule
 import org.litote.kmongo.util.KMongoUtil
+import org.litote.kmongo.runCommand
 import java.time.Duration
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -285,6 +287,11 @@ private fun generateIndex(document: Bson, indexOptions: com.mongodb.client.model
         return index
     }
     return null
+}
+
+fun pingMongoDatabase(database: MongoDatabase): Boolean {
+    val result = database.runCommand<Document>("{ ping: 1 }")
+    return result!!.get("ok") == 1.0
 }
 
 private const val DocumentDBIndexLimitSize = 32

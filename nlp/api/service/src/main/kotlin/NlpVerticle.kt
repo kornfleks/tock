@@ -36,6 +36,8 @@ import ai.tock.shared.security.auth.TockAuthProvider
 import ai.tock.shared.security.initEncryptor
 import ai.tock.shared.vertx.WebVerticle
 import ai.tock.shared.vertx.makeDetailedHealthcheck
+import ai.tock.shared.pingMongoDatabase
+import com.mongodb.MongoClient
 import io.vertx.ext.web.RoutingContext
 import mu.KLogger
 import mu.KotlinLogging
@@ -50,6 +52,7 @@ class NlpVerticle : WebVerticle() {
     override val rootPath: String = property("tock_nlp_root", "/rest/nlp")
 
     private val executor: Executor by injector.instance()
+    private val mongoClient: MongoClient by injector.instance()
 
     override val logger: KLogger = KotlinLogging.logger {}
 
@@ -199,7 +202,9 @@ class NlpVerticle : WebVerticle() {
 
     override fun detailedHealthcheck(): (RoutingContext) -> Unit = makeDetailedHealthcheck(
         listOf(
-            Pair("duckling_service", { FrontClient.healthcheck() })
+            Pair("duckling_service", { FrontClient.healthcheck() }),
+            Pair("tock_front_database", { pingMongoDatabase(mongoClient.getDatabase("tock_front")) }),
+            Pair("tock_model_database", { pingMongoDatabase(mongoClient.getDatabase("tock_model")) })
         )
     )
 
